@@ -1,0 +1,15 @@
+<h1>Todo List</h1>
+<form method="POST" action="{{ url_for('add') }}">
+    <input name="text" placeholder="Todo" required>
+    <input name="priority" type="number" placeholder="Priority">
+    <input name="deadline" type="date">
+    <button>Add</button>
+</form>
+<ul>
+    {% for todo in todos %}
+    <li>{{ todo.text }} (P:{{ todo.priority }}, D:{{ todo.deadline }}) 
+        <form method="POST" action="{{ url_for('delete', id=todo.id) }}"><button>Delete</button></form>
+    </li>
+    {% endfor %}
+</ul>
+<form method="GET" action="{{ url_for('search') }}"><input name="query" placeholder="Search"><button>Search</button></form>
