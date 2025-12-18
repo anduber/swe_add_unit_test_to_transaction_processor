@@ -147,6 +147,59 @@ class TestTransactionProcessorRulesTest(unittest.TestCase):
         expected_fee = (fx_fee + network_fee).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.assertEqual(res.processed_amount, _q2(Decimal("1000") + expected_fee))
 
+    # -------------------------
+    # Business rules
+    # -------------------------
+
+    def test_business_low_volume_fee_applies_below_100(self):
+        r = _mk_request(amount=Decimal("500"), channel=m.Channel.WEB)
+        c = _mk_customer(id=30, account_type=m.AccountType.BUSINESS, monthly_transaction_count=99)
+        with _freeze_utcnow(datetime(2024, 1, 1, 12, 0, 0)):
+            res = self.p.process_transaction(r, c)
+        self.assertEqual(res.processed_amount, _q2(Decimal("502.50")))
+        self.assertIn("Business low-volume fee applied.", res.messages)
+
+    def test_business_low_volume_fee_not_applied_at_100(self):
+        r = _mk_request(amount=Decimal("500"), channel=m.Channel.WEB)
+        c = _mk_customer(id=31, account_type=m.AccountType.BUSINESS, monthly_transaction_count=100)
+        with _freeze_utcnow(datetime(2024, 1, 1, 12, 0, 0)):
+            res = self.p.process_transaction(r, c)
+        self.assertEqual(res.processed_amount, _q2(Decimal("500")))
+        self.assertNotIn("Business low-volume fee applied.", res.messages)
+        
+    # -----------------------------------
+    # Daily limit & overdraft (boundaries)
+    # -----------------------------------
+
+    def test_daily_limit_exactly_equal_allows(self):
+        tx_ts = datetime(2024, 1, 2, 10, 0, 0)
+        r = _mk_request(amount=Decimal("200"), timestamp=tx_ts, channel=m.Channel.ATM)
+        c = _mk_customer(id=40, daily_limit=Decimal("1000"), has_overdraft_protection=False)
+
+        self.p._daily_totals[(c.id, tx_ts.date())] = Decimal("800")
+        with _freeze_utcnow(datetime(2024, 1, 2, 12, 0, 0)):
+            res = self.p.process_transaction(r, c)
+
+        self.assertEqual(res.processed_amount, _q2(Decimal("200")))
+        self.assertEqual(self.p._get_daily_total(c.id, tx_ts.date()), Decimal("1000"))
+
+    def test_daily_limit_exceeded_no_overdraft_raises_and_does_not_update_totals(self):
+        tx_ts = datetime(2024, 1, 2, 10, 0, 0)
+        r = _mk_request(amount=Decimal("201"), timestamp=tx_ts, channel=m.Channel.ATM)
+        c = _mk_customer(id=41, daily_limit=Decimal("1000"), has_overdraft_protection=False)
+
+        self.p._daily_totals[(c.id, tx_ts.date())] = Decimal("800")
+        before = self.p._get_daily_total(c.id, tx_ts.date())
+
+        with _freeze_utcnow(datetime(2024, 1, 2, 12, 0, 0)):
+            with self.assertRaises(m.DailyLimitExceededException) as ex:
+                self.p.process_transaction(r, c)
+
+        self.assertEqual("Daily limit exceeded.", str(ex.exception))
+        self.assertEqual(self.p._get_daily_total(c.id, tx_ts.date()), before)
+
+
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

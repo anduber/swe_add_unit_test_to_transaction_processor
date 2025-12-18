@@ -54,6 +54,22 @@ def test_rules_suite_detects_premium_mobile_discount_logic(pytester, rules_suite
     _assert_suite_failed(result)
 
 
+def test_rules_suite_detects_business_low_volume_logic(pytester, rules_suite_text) -> None:
+    if "\n    def test_business_low_volume_fee_applies_below_100" not in rules_suite_text:
+        pytest.skip("Business low-volume tests are not present in the rules suite.")
+    impl = _transaction_processor_text("broken_business_low_volume_fee.py")
+    result = _run_rules_suite(pytester, rules_suite_text, impl)
+    _assert_suite_failed(result)
+
+
+def test_rules_suite_detects_daily_limit_logic(pytester, rules_suite_text) -> None:
+    if "\n    def test_daily_limit_exactly_equal_allows" not in rules_suite_text:
+        pytest.skip("Daily limit tests are not present in the rules suite.")
+    impl = _transaction_processor_text("broken_daily_limit_overdraft.py")
+    result = _run_rules_suite(pytester, rules_suite_text, impl)
+    _assert_suite_failed(result)
+
+
 def test_rules_suite_passes_with_request_validation(pytester, rules_suite_text) -> None:
     impl = _transaction_processor_text("correct")
     result = _run_rules_suite(pytester, rules_suite_text, impl)
