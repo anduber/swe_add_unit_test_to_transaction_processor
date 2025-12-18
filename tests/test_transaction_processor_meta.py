@@ -41,6 +41,10 @@ def _assert_suite_failed(result) -> None:
     outcomes = result.parseoutcomes()
     assert outcomes.get("failed", 0) >= 1
 
+def _assert_min_failed(result, minimum: int = 1) -> None:
+    outcomes = result.parseoutcomes()
+    print("meta outcomes:", outcomes.get("failed", 0))  
+    assert outcomes.get("failed", 0) >= minimum
 
 def _assert_suite_passed(result) -> None:
     outcomes = result.parseoutcomes()
@@ -51,7 +55,7 @@ def _assert_suite_passed(result) -> None:
 def test_rules_suite_fails_when_request_not_validated(pytester, rules_suite_text) -> None:
     impl = _transaction_processor_text(remove_request_validation=True)
     result = _run_rules_suite(pytester, rules_suite_text, impl)
-    _assert_suite_failed(result)
+    _assert_min_failed(result)
 
 
 def test_rules_suite_passes_with_request_validation(pytester, rules_suite_text) -> None:
