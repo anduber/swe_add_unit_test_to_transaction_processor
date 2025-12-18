@@ -1,9 +1,11 @@
-version: '3'
+version: "3.8"
+
 services:
-  app:
+  tests:
     build: .
-    ports:
-      - "5000:5000"
     volumes:
       - .:/app
-    command: python repository_after/app/main.py
+    command: >
+      pytest -q
+      tests/test_division_meta.py
+      tests/test_transaction_processor_meta.py

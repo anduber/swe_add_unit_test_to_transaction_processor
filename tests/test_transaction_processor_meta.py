@@ -4,24 +4,16 @@ from pathlib import Path
 
 pytest_plugins = ("pytester",)
 
-
 BASE_PROCESSOR_PATH = Path(__file__).resolve().parents[1] / "repository_after" / "transaction_processor.py"
+BROKEN_IMPL_DIR = Path(__file__).resolve().parent / "resources" / "transaction_processor"
 
 
 @lru_cache(maxsize=None)
-def _base_transaction_processor_text() -> str:
-    return BASE_PROCESSOR_PATH.read_text()
-
-
-def _transaction_processor_text(*, remove_request_validation: bool) -> str:
-    text = _base_transaction_processor_text()
-    if remove_request_validation:
-        text = text.replace(
-            "        if request is None:\n            raise ValueError(\"request is required\")\n",
-            "",
-            1,
-        )
-    return text
+def _transaction_processor_text(variant: str) -> str:
+    if variant == "correct":
+        return BASE_PROCESSOR_PATH.read_text()
+    resource_path = BROKEN_IMPL_DIR / variant
+    return resource_path.read_text()
 
 
 @pytest.fixture
@@ -37,14 +29,10 @@ def _run_rules_suite(pytester, suite_text: str, impl_text: str):
     return pytester.runpytest()
 
 
-def _assert_suite_failed(result) -> None:
+def _assert_suite_failed(result,minimum: int = 1) -> None:
     outcomes = result.parseoutcomes()
-    assert outcomes.get("failed", 0) >= 1
-
-def _assert_min_failed(result, minimum: int = 1) -> None:
-    outcomes = result.parseoutcomes()
-    print("meta outcomes:", outcomes.get("failed", 0))  
     assert outcomes.get("failed", 0) >= minimum
+
 
 def _assert_suite_passed(result) -> None:
     outcomes = result.parseoutcomes()
@@ -53,12 +41,20 @@ def _assert_suite_passed(result) -> None:
 
 
 def test_rules_suite_fails_when_request_not_validated(pytester, rules_suite_text) -> None:
-    impl = _transaction_processor_text(remove_request_validation=True)
+    impl = _transaction_processor_text("broken_missing_request_validation.py")
     result = _run_rules_suite(pytester, rules_suite_text, impl)
-    _assert_min_failed(result)
+    _assert_suite_failed(result)
+
+
+def test_rules_suite_detects_premium_mobile_discount_logic(pytester, rules_suite_text) -> None:
+    if "\n    def test_premium_mobile_discount_applies_for_non_international" not in rules_suite_text:
+        pytest.skip("Premium discount tests are not present in the rules suite.")
+    impl = _transaction_processor_text("broken_premium_mobile_discount.py")
+    result = _run_rules_suite(pytester, rules_suite_text, impl)
+    _assert_suite_failed(result)
 
 
 def test_rules_suite_passes_with_request_validation(pytester, rules_suite_text) -> None:
-    impl = _transaction_processor_text(remove_request_validation=False)
+    impl = _transaction_processor_text("correct")
     result = _run_rules_suite(pytester, rules_suite_text, impl)
     _assert_suite_passed(result)
