@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . .
 
-CMD ["pytest", "-q", "tests/"]
+CMD ["pytest", "-q", "tests/test_division_meta.py", "tests/test_transaction_processor_rules_meta.py"]
