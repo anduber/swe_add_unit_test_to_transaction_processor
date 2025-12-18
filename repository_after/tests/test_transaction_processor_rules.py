@@ -75,11 +75,7 @@ def _q2(x: Decimal) -> Decimal:
 class TestTransactionProcessorRulesTest(unittest.TestCase):
     def setUp(self):
         self.p = m.TransactionProcessor()
-
-    # -------------------------
-    # Input validation & basics
-    # -------------------------
-
+        
     def test_missing_request_raises(self):
         c = _mk_customer()
         with self.assertRaises(ValueError) as ex:
